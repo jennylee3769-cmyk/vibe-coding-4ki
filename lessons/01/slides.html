@@ -354,6 +354,7 @@ npx skills add heygen-com/hyperframes -g -a codex -y --copy -s &quot;*&quot;
   var WANT_ADMIN = params.has('admin');
   var IS_SCREEN = params.has('screen');
   var IS_VIEW = params.has('view');
+  var IS_STUDY = params.get('mode') === 'study';
   var qSlide = parseInt(params.get('slide'), 10);
   if (!isNaN(qSlide) && qSlide >= 1 && qSlide <= total) {
     idx = qSlide - 1;
@@ -683,7 +684,7 @@ npx skills add heygen-com/hyperframes -g -a codex -y --copy -s &quot;*&quot;
     if(remoteSlide!==s.slide||LOCKED||IS_SCREEN)show(s.slide);else updateNav();
     remoteSlide=s.slide;fbStatus.textContent='실시간 연결 · 1차시 · '+(s.locked?'강사 따라가기':'자유 이동');
   }
-  if(!IS_VIEW){
+  if(!IS_VIEW&&!IS_STUDY){
     fbStatus.textContent='Firebase 연결 중 · 기본 슬라이드 열람 가능';
     var fallbackTimer=setTimeout(function(){if(!remoteOnline)offlineView('연결 지연 · 자유 열람 · 재연결 대기');},8000);
     import('../../firebase/sync.js').then(function(module){
@@ -693,7 +694,7 @@ npx skills add heygen-com/hyperframes -g -a codex -y --copy -s &quot;*&quot;
       transport.onState(function(s){clearTimeout(fallbackTimer);if(!s||s.isEmpty)remoteState=null;applyRemote(s)});
       transport.onConnection(function(on){remoteOnline=on;if(on){if(remoteState)applyRemote(remoteState)}else offlineView('동기화 연결 끊김 · 자유 열람 · 재연결 대기')});
     }).catch(function(){clearTimeout(fallbackTimer);offlineView('Firebase 연결 실패 · 자유 열람')});
-  }else{fbStatus.textContent='강사 미리보기 · 동기화 없이 열람';}
+  }else if(IS_STUDY){offlineView('차시별 자료 열람 · 1차시');}else{fbStatus.textContent='강사 미리보기 · 동기화 없이 열람';}
 
 })();
 </script>
