@@ -9,16 +9,16 @@ export function createSync(config,deckId){
  const db=getDatabase(app),auth=getAuth(app),stateRef=ref(db,'decks/'+deckId+'/state');
  let connected=false,isAdmin=false,user=null,known=false,current=null,authGeneration=0;
  const stateListeners=new Set(),adminListeners=new Set(),connectionListeners=new Set();
- let adminOff=null;
- const emitAdmin=()=>adminListeners.forEach(cb=>cb(isAdmin,user));
+ let adminOff=null,adminCheck="signed-out",adminError=null;
+ const emitAdmin=()=>adminListeners.forEach(cb=>cb(isAdmin,user,{status:adminCheck,error:adminError}));
  const stateOff=onValue(stateRef,s=>{known=true;current=s.val();stateListeners.forEach(cb=>cb(current===null?{isEmpty:true}:validState(current)?{...current,isEmpty:false}:null))},()=>{known=false;current=null;stateListeners.forEach(cb=>cb(null))});
  const connectionOff=onValue(ref(db,'.info/connected'),s=>{connected=s.val()===true;connectionListeners.forEach(cb=>cb(connected))},()=>{connected=false;connectionListeners.forEach(cb=>cb(false))});
- const authOff=onAuthStateChanged(auth,u=>{authGeneration++;const generation=authGeneration;if(adminOff){adminOff();adminOff=null}user=u;isAdmin=false;emitAdmin();if(u)adminOff=onValue(ref(db,'admins/'+u.uid),s=>{if(generation!==authGeneration)return;isAdmin=s.val()===true;emitAdmin()},()=>{if(generation!==authGeneration)return;isAdmin=false;emitAdmin()})});
+ const authOff=onAuthStateChanged(auth,u=>{authGeneration++;const generation=authGeneration;if(adminOff){adminOff();adminOff=null}user=u;isAdmin=false;adminCheck=u?"pending":"signed-out";adminError=null;emitAdmin();if(u)adminOff=onValue(ref(db,'admins/'+u.uid),s=>{if(generation!==authGeneration)return;isAdmin=s.val()===true;adminCheck=isAdmin?"authorized":"denied";adminError=null;emitAdmin()},e=>{if(generation!==authGeneration)return;isAdmin=false;adminCheck="error";adminError=e.code||"database/permission-denied";emitAdmin()})});
  function writable(){if(!user||!isAdmin)throw Error('not-admin');if(!connected)throw Error('offline');if(!known)throw Error('state-unread')}
  return {
   onState(cb){stateListeners.add(cb);if(known)cb(current===null?{isEmpty:true}:validState(current)?{...current,isEmpty:false}:null);return()=>stateListeners.delete(cb)},
   onConnection(cb){connectionListeners.add(cb);cb(connected);return()=>connectionListeners.delete(cb)},
-  onAdmin(cb){adminListeners.add(cb);cb(isAdmin,user);return()=>adminListeners.delete(cb)},
+  onAdmin(cb){adminListeners.add(cb);cb(isAdmin,user,{status:adminCheck,error:adminError});return()=>adminListeners.delete(cb)},
   async login(email,password){await setPersistence(auth,browserSessionPersistence);return signInWithEmailAndPassword(auth,email,password)},
   logout(){return signOut(auth)},
   async initialize(){writable();if(current!==null)throw Error('state-exists');return runTransaction(stateRef,s=>s===null?{lesson:1,slide:0,locked:true,pdf:true,focus:false,updatedAt:serverTimestamp()}:undefined,{applyLocally:false})},
