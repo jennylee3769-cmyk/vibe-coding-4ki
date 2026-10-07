@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<!--
+  웹슬라이드 스타터 · 두온교육 「강의 사이트 제작 노하우」 참가자 키트
+  먼저 바꿀 것
+  1) 아래 스크립트의 LS = 'mykit_' → 내 강의 고유 접두사 (예: 'ai0927_')
+     접두사가 겹치면 다른 강의 사이트와 저장값이 섞임
+  2) <title>, description, 표지·마침 슬라이드의 [ ] 자리
+  3) 슬라이드 추가·삭제 시 aria-label 번호와 주석 번호 함께 재정렬 (AGENTS.md 참고)
+  외부 파일 없음 · 백엔드 없음 · 이 파일 하나로 동작
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>4차시 · 영상 만들기와 소개 페이지 완성</title>
+<meta name="description" content="원본 PDF 31페이지 · 이정임 강사 · AI 리터러시 클래스 · AI 연구소">
+<meta name="theme-color" content="#111111">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+
+
+<style>
+:root{
+  --ink:#111111; --sub:#555555; --mute:#767676;
+  --line:#E3E3E3;
+  --slide-bg:#F4F4F3; --card:#FFFFFF;
+  --accent:#F6C744; --accent-sub:#3A3000;
+  --shadow:0 .45cqi 1.4cqi rgba(0,0,0,.09), 0 .1cqi .3cqi rgba(0,0,0,.07);
+  --shadow-lg:0 .8cqi 2.4cqi rgba(0,0,0,.13), 0 .18cqi .45cqi rgba(0,0,0,.08);
+  --alert:#D32F2F;
+  --nav-h:60px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:#0E0E0E;color:var(--ink);
+  font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;
+  word-break:keep-all;overflow-wrap:anywhere;-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:inherit;text-wrap:balance;letter-spacing:-.01em}
+p,li{text-wrap:pretty}
+button{font-family:inherit}
+
+/* 16:9 무대 · 모든 크기를 무대 폭 기준 cqi로 → 창 크기와 무관하게 같은 비율 */
+#stage{position:fixed;left:50%;top:calc((100vh - var(--nav-h)) / 2);transform:translate(-50%,-50%);
+  width:min(100vw, calc((100vh - var(--nav-h)) * 16 / 9));aspect-ratio:16/9;
+  container-type:inline-size;background:var(--slide-bg);overflow:hidden}
+
+.slide{position:absolute;inset:0;display:none;flex-direction:column;padding:4.6cqi 6cqi;background:var(--slide-bg);color:var(--ink)}
+.slide.active{display:flex}
+.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;gap:1.8cqi;min-height:0}
+.slide-content.compact{gap:1cqi}
+.slide-content.compact .bullets{gap:.8cqi}
+.slide-content.compact .bullets li{padding:.9cqi 1.7cqi}
+
+/* 타이포 (단위 cqi) */
+.kicker{display:flex;align-items:center;gap:1cqi;font-size:1.6cqi;font-weight:800;letter-spacing:.06em;color:var(--ink)}
+.kicker::before{content:'';flex:0 0 auto;width:2.4cqi;height:.36cqi;background:currentColor}
+h1{font-size:6cqi;font-weight:900;line-height:1.22}
+h2{font-size:3.9cqi;font-weight:800;line-height:1.28}
+.lede{font-size:2.2cqi;color:var(--sub);line-height:1.6}
+
+/* 표지·마침: 머스타드 옐로 / 휴식: 검정 반전 */
+.title-slide{background:var(--accent);color:#111111}
+.title-slide .slide-content{align-items:center;text-align:center}
+.title-slide .kicker{color:#111111}
+.title-slide h1::after{content:'';display:block;width:6cqi;height:.4cqi;background:#111111;margin:2.4cqi auto 0}
+.title-slide .lede{color:var(--accent-sub)}
+.slide.dark{background:#111111;color:#FFFFFF}
+.slide.dark .kicker{color:#FFFFFF}
+.slide.dark .lede{color:#BDBDBD}
+.meta-row{display:flex;justify-content:center;gap:1.2cqi;flex-wrap:wrap;font-size:1.7cqi}
+.meta-row span{border:.18cqi solid #111111;border-radius:99cqi;padding:.7cqi 2cqi;color:#111111;font-weight:600}
+
+/* 불릿: 한 줄씩 그림자 박스 */
+.bullets{display:flex;flex-direction:column;gap:1.2cqi}
+.bullets li{list-style:none;display:flex;gap:1.4cqi;align-items:flex-start;font-size:2.25cqi;line-height:1.55;
+  background:var(--card);box-shadow:var(--shadow);border-radius:1cqi;padding:1.25cqi 2cqi}
+.bullets li::before{content:'';flex:0 0 auto;width:.75cqi;height:.75cqi;background:var(--ink);margin-top:1.36cqi}
+.slide-content a{color:inherit;text-underline-offset:.3em;text-decoration-thickness:.15em}
+
+/* 카드 */
+.card-grid{display:grid;gap:1.8cqi}
+.c2{grid-template-columns:repeat(2,1fr)}
+.c3{grid-template-columns:repeat(3,1fr)}
+.c4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--card);border-radius:1.2cqi;box-shadow:var(--shadow-lg);padding:2.2cqi;
+  display:flex;flex-direction:column;gap:.8cqi;min-width:0}
+.card .n{font-size:3.4cqi;font-weight:900;line-height:1;color:var(--ink)}
+.card .t{font-size:2.3cqi;font-weight:800}
+.card .d{font-size:1.8cqi;color:var(--sub);line-height:1.5}
+/* 색으로만 구분 금지: 아쉬운 예 = 점선 + ✕, 좋은 예 = 굵은 검정 막대 + ✓ */
+.card.bad{background:#FAFAFA;box-shadow:none;border:.2cqi dashed #9E9E9E}
+.card.bad .t{color:var(--sub)}
+.card.bad .t::before{content:'✕  '}
+.card.good{border-left:.7cqi solid var(--ink)}
+.card.good .t::before{content:'✓  '}
+
+/* 표 */
+table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:1.85cqi;line-height:1.35;
+  background:var(--card);box-shadow:var(--shadow-lg);border-radius:1.2cqi;overflow:hidden}
+table.tbl th, table.tbl td{padding:.8cqi 1.6cqi;text-align:left;border-bottom:.12cqi solid var(--line)}
+table.tbl tbody tr:last-child td{border-bottom:none}
+table.tbl th{background:#111111;color:#FFFFFF;font-weight:800}
+table.tbl tr.today td{font-weight:800}
+table.tbl tr.today td:first-child{box-shadow:inset .55cqi 0 0 #111111}
+table.tbl td:first-child, table.tbl th:first-child{white-space:nowrap}
+table.tbl td:first-child{color:var(--sub)}
+
+/* 프롬프트 카드: 검정 박스 + 오른쪽 위 복사 버튼 */
+.prompt-card{position:relative;background:#111111;color:#F2F2F2;border-radius:1.2cqi;box-shadow:var(--shadow-lg);
+  padding:2cqi 2.4cqi;display:flex;flex-direction:column;gap:1cqi}
+.prompt-card .label{font-size:1.5cqi;font-weight:800;letter-spacing:.06em;color:#BDBDBD;padding-right:14cqi}
+.prompt-card blockquote{font-size:2cqi;line-height:1.6;color:#FFFFFF;border-left:.3cqi solid #666666;padding-left:1.6cqi;
+  font-style:normal;white-space:pre-wrap}
+.copy-btn{position:absolute;top:1.5cqi;right:1.6cqi;font-size:1.5cqi;font-weight:800;
+  padding:.7cqi 1.8cqi;border-radius:99cqi;border:none;background:#FFFFFF;color:#111111;cursor:pointer;min-height:44px;min-width:44px}
+.copy-btn:hover, .copy-btn.copied{background:#E2E2E2}
+.copy-btn:focus-visible{outline:.25cqi solid #FFFFFF;outline-offset:.25cqi}
+
+/* 타이머: 클릭 시작/일시정지 · 더블클릭 또는 R 키 리셋 */
+.timer-chip{display:inline-flex;align-items:center;gap:1cqi;align-self:flex-start;cursor:pointer;user-select:none;
+  background:var(--card);box-shadow:var(--shadow);border:.18cqi solid var(--ink);border-radius:99cqi;min-height:44px;
+  padding:.9cqi 2.2cqi;font-size:2cqi;font-weight:800;color:var(--ink)}
+.timer-chip .time{font-variant-numeric:tabular-nums;min-width:3.4em;text-align:center}
+.timer-chip.running{background:#111111;color:#FFFFFF}
+.timer-chip.warn .time{color:var(--alert)}
+.timer-chip.running.warn .time{color:#FF8A80}
+.timer-chip .state{font-size:1.4cqi;font-weight:700;opacity:.8}
+.timer-chip:focus-visible, .break-big:focus-visible{outline:.3cqi solid currentColor;outline-offset:.4cqi}
+.break-big{cursor:pointer;user-select:none;text-align:center;font-variant-numeric:tabular-nums;background:none;border:none;
+  font-size:16cqi;font-weight:900;line-height:1.05;color:#FFFFFF;min-height:44px;border-radius:1cqi}
+.break-big.warn{color:#FF8A80}
+
+/* 하단 네비 */
+#nav{position:fixed;left:0;right:0;bottom:0;height:var(--nav-h);background:#0E0E0E;border-top:1px solid #222;
+  display:flex;align-items:center;gap:8px;padding:0 14px;color:#EEEEEE;font-size:14px;z-index:200}
+#nav button, #nav a{background:#1F1F1F;color:#EEEEEE;border:1px solid #2E2E2E;border-radius:8px;
+  height:44px;min-width:44px;padding:0 14px;font-size:14px;font-weight:700;cursor:pointer;
+  text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+#nav button:hover, #nav a:hover{background:#2C2C2C}
+#nav button:disabled{opacity:.35;cursor:default}
+#nav button:focus-visible, #nav a:focus-visible{outline:2px solid #FFFFFF;outline-offset:2px}
+#nav .grow{flex:1}
+#counter{font-variant-numeric:tabular-nums;font-weight:800;min-width:5.5em;text-align:center}
+#modeBadge{border:1px solid #444;border-radius:99px;padding:4px 12px;font-size:12.5px;font-weight:700;color:#DDDDDD;display:none}
+#modeBadge.show{display:inline-block}
+#modeBadge.follow{background:#FFFFFF;color:#111111;border-color:#FFFFFF}
+.hint{color:#9A9A9A;font-size:12.5px}
+#progress{position:fixed;left:0;bottom:var(--nav-h);height:3px;background:#FFFFFF;width:0;z-index:201;transition:width .2s}
+@media (max-width:760px){ #nav .hide-sm{display:none} }
+
+/* 전체보기: 실제 축소판 */
+.grid-overlay{position:fixed;inset:0;z-index:500;background:rgba(10,10,10,.97);display:none;overflow:auto;padding:22px 22px 40px}
+.grid-overlay.open{display:block}
+.grid-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.grid-head h2{color:#FFFFFF;font-size:20px;font-weight:800}
+.grid-head button{background:#1F1F1F;color:#EEEEEE;border:1px solid #2E2E2E;border-radius:8px;height:44px;padding:0 16px;
+  font-size:14px;font-weight:700;cursor:pointer}
+.grid-head button:focus-visible{outline:2px solid #FFFFFF;outline-offset:2px}
+.grid-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.mini{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;cursor:pointer;
+  outline:3px solid transparent;outline-offset:2px;background:var(--slide-bg)}
+.mini:hover, .mini:focus-visible, .mini.current{outline-color:#FFFFFF}
+/* 960px 기준으로 그린 뒤 축소 · 240px에 직접 그리면 브라우저 최소 글꼴 크기에 걸려 넘침 */
+.mini-inner{position:absolute;left:0;top:0;width:960px;height:540px;container-type:inline-size;
+  transform-origin:0 0;pointer-events:none;background:var(--slide-bg)}
+.mini-inner .slide{display:flex}
+.mini-num{position:absolute;right:6px;top:6px;background:rgba(0,0,0,.78);color:#FFFFFF;font-size:12px;font-weight:700;
+  padding:2px 8px;border-radius:99px;z-index:2}
+
+@media (prefers-reduced-motion:reduce){ #progress{transition:none} }
+
+/* PDF: 16:9 페이지 1장 = 슬라이드 1장 */
+@page{size:13.333in 7.5in;margin:0}
+@media print{
+  html, body{overflow:visible!important;height:auto!important;background:#FFFFFF}
+  #nav, #progress, .grid-overlay{display:none!important}
+  #stage{position:static!important;transform:none!important;width:13.333in!important;aspect-ratio:auto!important;overflow:visible!important}
+  #stage > .slide{position:relative!important;display:flex!important;width:13.333in;height:7.5in;
+    break-after:page;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #stage > .slide:last-child{break-after:auto;page-break-after:auto}
+  html.no-pdf #stage{display:none!important}
+  html.no-pdf body::before{content:"PDF 저장 비활성화 · 강사에게 문의";
+    display:block;padding:2rem;font-size:14pt;color:#000}
+}
+
+.fb-banner{position:fixed;left:0;right:0;top:0;z-index:300;background:#F6C744;color:#111;
+  font:700 14px/1.4 'Pretendard Variable',Pretendard,sans-serif;text-align:center;padding:8px 12px}
+.conn{border:1px solid #444;border-radius:99px;padding:4px 12px;font-size:12.5px;font-weight:700;color:#DDD}
+#nav button[aria-pressed="true"]{background:#FFFFFF;color:#111111}
+#nav [hidden]{display:none!important}
+.login{position:fixed;inset:0;z-index:600;background:rgba(10,10,10,.8);display:flex;align-items:center;justify-content:center;padding:16px}
+.login[hidden]{display:none}
+.login-box{background:#FFF;color:#111;border-radius:14px;padding:24px;width:min(360px,100%);display:flex;flex-direction:column;gap:12px;
+  font-family:'Pretendard Variable',Pretendard,sans-serif}
+.login-box h2{font-size:20px}
+.login-box label{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:700}
+.login-box input{font:inherit;font-weight:500;border:1px solid #BBB;border-radius:8px;padding:10px 12px;min-height:44px}
+.login-box .row{display:flex;gap:8px}
+.login-box button{font:inherit;font-weight:800;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #BBB;background:#FFF;cursor:pointer}
+.login-box button.primary{background:#111;color:#FFF;border-color:#111}
+.login-box .err{color:#B71C1C;font-size:13px;font-weight:700;min-height:1.2em}
+</style>
+
+<style>
+:root{--slide-bg:#f4f1e9;--nav-h:64px}
+body{background:#173c33;font-family:'Malgun Gothic',sans-serif}
+.source-slide{padding:0!important;background:#f4f1e9!important}
+.source-image{display:block;width:100%;height:100%;object-fit:contain;user-select:none}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0)}
+#modeBadge{display:none!important}#nav .hint{display:none}#nav{padding:0 8px;gap:6px;background:#102b24}#nav button{padding:0 12px}
+.mini-num{left:0;right:0;bottom:0;top:auto;border-radius:0;padding:6px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+dialog{position:fixed;inset:0;margin:auto;width:min(860px,calc(100vw - 24px));max-height:calc(100dvh - 24px);border:0;border-radius:12px;padding:20px;background:#f4f1e9;color:#173c33;overflow:auto}
+dialog::backdrop{background:#000b}dialog .dialog-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:16px}dialog h2{font-size:21px}dialog button{min-height:44px;min-width:44px;cursor:pointer;border:1px solid #b5bfb9;background:white;color:#173c33;border-radius:6px;padding:6px 12px;font-size:16px}
+.prompt-card{margin:12px 0;padding:16px;background:white;border:1px solid #d9ded7;border-radius:8px}.prompt-card header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.prompt-card h3{font-size:17px}.prompt-card pre{font:16px/1.7 'Malgun Gothic',sans-serif;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;user-select:text}
+#zoomDialog{width:calc(100vw - 24px);height:calc(100dvh - 24px)}#zoomImage{display:block;width:100%;height:auto}#zoomDialog.zoomed #zoomImage{width:1600px;max-width:none}
+@media(max-width:760px){#nav .grow{display:none}#nav{justify-content:center;gap:4px}#nav button{padding:0 9px;font-size:13px}#counter{min-width:4.3em;font-size:13px}.grid-list{grid-template-columns:1fr}dialog{padding:14px}.prompt-card{padding:12px}}
+@media print{dialog{display:none!important}.source-slide{padding:0!important}.instructor-panel,.login{display:none!important}.sr-only{display:none!important}}
+</style><style>.prompt-card[hidden]{display:none!important}</style><style>
+#promptDialog .prompt-card{color:#173c33;display:block;gap:0;box-shadow:0 2px 8px #0001}
+#promptDialog .prompt-card header{background:none;color:#173c33;position:static}
+#promptDialog .copy-btn{position:static;flex-shrink:0;font-size:16px;border:1px solid #b5bfb9;border-radius:6px;padding:6px 12px;color:#173c33;background:#fff;min-height:44px}
+#promptDialog .copy-btn:focus-visible{outline:2px solid #173c33;outline-offset:2px}
+#promptDialog .prompt-card h3,#promptDialog .prompt-card pre{color:#173c33}
+#promptDialog .prompt-card[hidden]{display:none!important}
+</style><style>#syncStatus{position:fixed;top:8px;right:8px;z-index:90;font:12px/1.6 sans-serif;background:#173c33;color:white;padding:6px 10px;border-radius:6px;max-width:85vw;overflow-wrap:anywhere}#focusOverlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.8);color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;flex-direction:column;font:700 30px/1.5 "Malgun Gothic",sans-serif}#focusOverlay[hidden]{display:none}#focusOverlay .emoji{font-size:clamp(90px,18vw,180px)}@media(max-width:600px){#focusOverlay{font-size:24px}#syncStatus{font-size:11px}}</style></head>
+<body><div id="syncStatus" role="status">Firebase 연결 대기</div><div id="focusOverlay" role="alert" aria-live="assertive" hidden><span class="emoji" aria-hidden="true">🤫</span><p>잠깐, 선생님 설명에 집중해 주세요.</p></div><script src="../../firebase/config.js"></script>
+
+<div id="fbBanner" class="fb-banner" hidden>Firebase 설정 전 · 자유 열람 모드</div>
+
+<main id="stage" aria-label="4차시 32장 웹슬라이드"><section class="slide source-slide" aria-label="1. 영상 만들기와 소개 페이지 완성"><h2 class="sr-only">영상 만들기와 소개 페이지 완성</h2><img class="source-image" src="assets/page-01.png" alt="1페이지 · 영상 만들기와 소개 페이지 완성" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="2. 오늘의 결과물 3가지"><h2 class="sr-only">오늘의 결과물 3가지</h2><img class="source-image" src="assets/page-02.png" alt="2페이지 · 오늘의 결과물 3가지" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="3. 영상 먼저 → 영상 담은 페이지"><h2 class="sr-only">영상 먼저 → 영상 담은 페이지</h2><img class="source-image" src="assets/page-03.png" alt="3페이지 · 영상 먼저 → 영상 담은 페이지" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="4. 영상 재료가 폴더에 있는지 확인"><h2 class="sr-only">영상 재료가 폴더에 있는지 확인</h2><img class="source-image" src="assets/page-04.png" alt="4페이지 · 영상 재료가 폴더에 있는지 확인" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="5. 스킬 인식 · node · ffmpeg 점검"><h2 class="sr-only">스킬 인식 · node · ffmpeg 점검</h2><img class="source-image" src="assets/page-05.png" alt="5페이지 · 스킬 인식 · node · ffmpeg 점검" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="6. 막혔을 때 세 갈래"><h2 class="sr-only">막혔을 때 세 갈래</h2><img class="source-image" src="assets/page-06.png" alt="6페이지 · 막혔을 때 세 갈래" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="7. HTML 한 장 = 영상 한 편"><h2 class="sr-only">HTML 한 장 = 영상 한 편</h2><img class="source-image" src="assets/page-07.png" alt="7페이지 · HTML 한 장 = 영상 한 편" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="8. 브리프 → 스토리보드 → 미리보기 → 렌더"><h2 class="sr-only">브리프 → 스토리보드 → 미리보기 → 렌더</h2><img class="source-image" src="assets/page-08.png" alt="8페이지 · 브리프 → 스토리보드 → 미리보기 → 렌더" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="9. 영상이 글이면 말로 고칠 수 있음"><h2 class="sr-only">영상이 글이면 말로 고칠 수 있음</h2><img class="source-image" src="assets/page-09.png" alt="9페이지 · 영상이 글이면 말로 고칠 수 있음" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="10. 글자 움직임 : 타이포 · 로어서드 · 캡션"><h2 class="sr-only">글자 움직임 : 타이포 · 로어서드 · 캡션</h2><img class="source-image" src="assets/page-10.png" alt="10페이지 · 글자 움직임 : 타이포 · 로어서드 · 캡션" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="11. 장면 연결 : 전환 · 이징 · 타이밍"><h2 class="sr-only">장면 연결 : 전환 · 이징 · 타이밍</h2><img class="source-image" src="assets/page-11.png" alt="11페이지 · 장면 연결 : 전환 · 이징 · 타이밍" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="12. 숫자와 표지 : 카운트업 · 차트 · 리빌"><h2 class="sr-only">숫자와 표지 : 카운트업 · 차트 · 리빌</h2><img class="source-image" src="assets/page-12.png" alt="12페이지 · 숫자와 표지 : 카운트업 · 차트 · 리빌" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="13. 화면 설계 : 레이어 · 비율 · 소리"><h2 class="sr-only">화면 설계 : 레이어 · 비율 · 소리</h2><img class="source-image" src="assets/page-13.png" alt="13페이지 · 화면 설계 : 레이어 · 비율 · 소리" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="14. 60초 = 5구간 (30초는 절반)"><h2 class="sr-only">60초 = 5구간 (30초는 절반)</h2><img class="source-image" src="assets/page-14.png" alt="14페이지 · 60초 = 5구간 (30초는 절반)" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="15. 소리 없이도 전달되는 영상"><h2 class="sr-only">소리 없이도 전달되는 영상</h2><img class="source-image" src="assets/page-15.png" alt="15페이지 · 소리 없이도 전달되는 영상" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="16. 브리프 한 장 → 30초 영상"><h2 class="sr-only">브리프 한 장 → 30초 영상</h2><img class="source-image" src="assets/page-16.png" alt="16페이지 · 브리프 한 장 → 30초 영상" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="17. 브리프 프롬프트 : 목적 · 대상 · 길이 · 재료"><h2 class="sr-only">브리프 프롬프트 : 목적 · 대상 · 길이 · 재료</h2><img class="source-image" src="assets/page-17.png" alt="17페이지 · 브리프 프롬프트 : 목적 · 대상 · 길이 · 재료" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="18. 장면표 · 스케치 먼저 확인"><h2 class="sr-only">장면표 · 스케치 먼저 확인</h2><img class="source-image" src="assets/page-18.png" alt="18페이지 · 장면표 · 스케치 먼저 확인" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="19. 미리보기 → 말로 수정 루프"><h2 class="sr-only">미리보기 → 말로 수정 루프</h2><img class="source-image" src="assets/page-19.png" alt="19페이지 · 미리보기 → 말로 수정 루프" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="20. 승인 → 렌더 MP4"><h2 class="sr-only">승인 → 렌더 MP4</h2><img class="source-image" src="assets/page-20.png" alt="20페이지 · 승인 → 렌더 MP4" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="21. 가로 버전 + 웹용 5MB 이하"><h2 class="sr-only">가로 버전 + 웹용 5MB 이하</h2><img class="source-image" src="assets/page-21.png" alt="21페이지 · 가로 버전 + 웹용 5MB 이하" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="22. 소리 끄고 한 번 보기"><h2 class="sr-only">소리 끄고 한 번 보기</h2><img class="source-image" src="assets/page-22.png" alt="22페이지 · 소리 끄고 한 번 보기" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="23. 영상이 첫 화면인 소개 페이지"><h2 class="sr-only">영상이 첫 화면인 소개 페이지</h2><img class="source-image" src="assets/page-23.png" alt="23페이지 · 영상이 첫 화면인 소개 페이지" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="24. 여섯 섹션 · 재료는 준비 완료"><h2 class="sr-only">여섯 섹션 · 재료는 준비 완료</h2><img class="source-image" src="assets/page-24.png" alt="24페이지 · 여섯 섹션 · 재료는 준비 완료" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="25. index.html 한 파일 + 영상 파일"><h2 class="sr-only">index.html 한 파일 + 영상 파일</h2><img class="source-image" src="assets/page-25.png" alt="25페이지 · index.html 한 파일 + 영상 파일" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="26. 수정 루프 + 접근성 3종"><h2 class="sr-only">수정 루프 + 접근성 3종</h2><img class="source-image" src="assets/page-26.png" alt="26페이지 · 수정 루프 + 접근성 3종" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="27. 폴더째 올리기 → 카톡 미리보기"><h2 class="sr-only">폴더째 올리기 → 카톡 미리보기</h2><img class="source-image" src="assets/page-27.png" alt="27페이지 · 폴더째 올리기 → 카톡 미리보기" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="28. 4종 결과물 + 주소 하나"><h2 class="sr-only">4종 결과물 + 주소 하나</h2><img class="source-image" src="assets/page-28.png" alt="28페이지 · 4종 결과물 + 주소 하나" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="29. 오늘 자주 생기는 여섯 가지"><h2 class="sr-only">오늘 자주 생기는 여섯 가지</h2><img class="source-image" src="assets/page-29.png" alt="29페이지 · 오늘 자주 생기는 여섯 가지" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="30. 주소 3개를 휴대폰 화면으로"><h2 class="sr-only">주소 3개를 휴대폰 화면으로</h2><img class="source-image" src="assets/page-30.png" alt="30페이지 · 주소 3개를 휴대폰 화면으로" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="31. 이번 주, 2주 뒤, 그다음"><h2 class="sr-only">이번 주, 2주 뒤, 그다음</h2><img class="source-image" src="assets/page-31.png" alt="31페이지 · 이번 주, 2주 뒤, 그다음" width="1920" height="1080" decoding="async"></section><section class="slide source-slide" aria-label="32. 코드 대신 말로. 4주 만에 완성한 콘텐츠 패키지"><h2 class="sr-only">코드 대신 말로. 4주 만에 완성한 콘텐츠 패키지</h2><img class="source-image" src="assets/page-32-instructor.png" alt="32페이지 · 코드 대신 말로. 4주 만에 완성한 콘텐츠 패키지" width="1920" height="1080" decoding="async"></section></main><div id="progress" aria-hidden="true"></div>
+<nav id="nav" aria-label="슬라이드 이동">
+  
+  <button type="button" id="navPrev" aria-label="이전 슬라이드">◀</button>
+  <span id="counter" aria-live="polite">1 / 32</span>
+  <button type="button" id="navNext" aria-label="다음 슬라이드">▶</button>
+  <span id="modeBadge"></span>
+  <span id="connBadge" class="conn" hidden></span>
+  <span class="grow"></span>
+  <span class="hint hide-sm">← → 이동 · G 전체보기 · P PDF</span>
+  <button type="button" id="lockBtn" hidden>🔒 잠금</button>
+  <button type="button" id="pdfBtn" hidden>PDF 허용</button>
+  <button type="button" id="controlBtn" class="control-fab" hidden aria-controls="instructorPanel" aria-expanded="false">⚙ 강사 제어</button>
+  <button type="button" id="promptBtn">프롬프트</button><button type="button" id="zoomBtn">확대</button><button type="button" id="fullscreenBtn" class="hide-sm">전체화면</button><button type="button" id="gridBtn" aria-haspopup="dialog" aria-controls="gridOverlay">목차</button>
+  <button type="button" id="printBtn" class="hide-sm">⎙ PDF 저장</button>
+</nav>
+
+<aside class="instructor-panel" id="instructorPanel" hidden aria-label="강사 제어 패널">
+  <div class="instructor-head"><h2>강사 제어</h2><button type="button" id="controlClose" aria-label="강사 제어 닫기">✕</button></div>
+  <div class="instructor-status">
+    <div><small>현재 장</small><strong id="ctlSlide">1 / 32</strong></div>
+    <div><small>청중</small><strong id="ctlViewers">-</strong></div>
+    <div><small>연결</small><strong id="ctlConnection">로컬</strong></div>
+  </div>
+  <div class="instructor-row"><button type="button" id="ctlPrev">◀ 이전</button><button type="button" id="ctlNext" class="primary">다음 ▶</button><input id="ctlJump" type="number" min="1" max="31" value="1" aria-label="이동할 슬라이드 번호"><button type="button" id="ctlGo">이동</button></div>
+  <div class="instructor-row"><button type="button" id="ctlLock">청중 잠금</button><button type="button" id="ctlPdf">PDF 허용</button><button type="button" id="ctlFullscreen">전체화면</button></div>
+  <div class="instructor-timer"><strong id="ctlTimer">50:00</strong><div class="instructor-row"><button type="button" id="ctlTimerToggle">시작</button><button type="button" id="ctlTimerReset">초기화</button></div></div>
+  <div class="instructor-row"><a href="slides.html" target="_blank" rel="noopener">청중 화면</a><a href="slides.html?screen" target="_blank" rel="noopener">프로젝션 화면</a><span class="grow"></span><button type="button" id="ctlGrid">전체 보기</button></div>
+  <p class="instructor-note">단축키: C 패널 · ← → 이동 · G 전체 보기 · P PDF · Home 표지 · End 마침</p>
+</aside>
+
+<div class="grid-overlay" id="gridOverlay" role="dialog" aria-modal="true" aria-label="슬라이드 목차">
+  <div class="grid-head"><h2>슬라이드 목차</h2><button type="button" id="gridClose">닫기 (Esc)</button></div>
+  <div class="grid-list" id="gridList"></div>
+</div>
+
+<div class="login" id="login" hidden role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <form class="login-box" id="loginForm">
+    <h2 id="loginTitle">강사 로그인</h2>
+    <label>이메일<input id="lgEmail" type="email" autocomplete="username" required></label>
+    <label>비밀번호<input id="lgPw" type="password" autocomplete="current-password" required></label>
+    <p class="err" id="lgErr" role="alert"></p>
+    <div class="row"><button type="submit" class="primary">로그인</button><button type="button" id="lgClose">닫기</button></div>
+  </form>
+</div>
+
+
+<dialog id="promptDialog" aria-labelledby="promptTitle"><div class="dialog-head"><h2 id="promptTitle">프롬프트</h2><button data-close="promptDialog">닫기</button></div><p id="promptEmpty">이 장의 복사용 프롬프트 없음</p><article class="prompt-card" data-page="5"><header><h3>설치 확인 프롬프트</h3><button type="button" class="copy-btn" data-copy-target="prompt-1" aria-live="polite">복사</button></header><pre id="prompt-1">설치된 스킬 목록 보여 줘. hyperframes 관련 스킬이 있는지 확인해 줘.
+그다음 터미널에서 아래를 실행하고 결과를 표로 정리해 줘.
+- node -v (22 이상인지)
+- ffmpeg -version (첫 줄만)
+- npx hyperframes doctor
+문제가 있으면 원인과 해결 방법을 한 줄씩 알려 줘.</pre></article><article class="prompt-card" data-page="6"><header><h3>스킬 설치 명령 ( 재설치용)</h3><button type="button" class="copy-btn" data-copy-target="prompt-2" aria-live="polite">복사</button></header><pre id="prompt-2">npx skills add heygen-com/hyperframes -g -a codex -y --copy -s &quot;*&quot;</pre></article><article class="prompt-card" data-page="9"><header><h3>영상이 글이면 말로 고칠 수 있음 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-3" aria-live="polite">복사</button></header><pre id="prompt-3">2번 장면 글자 1.5배, 3초 → 2초</pre></article><article class="prompt-card" data-page="10"><header><h3>지시 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-4" aria-live="polite">복사</button></header><pre id="prompt-4">훅 문장을 단어 단위로 0.15초 간격으로 등장시키고, 마지막 단어만 표지 색으로 강조해 줘. 3초 안에 끝나게.
+저자 장면엔 화면 아래 1/3에 로어서드 : 이름 + 한 줄 직함.</pre></article><article class="prompt-card" data-page="11"><header><h3>지시 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-5" aria-live="polite">복사</button></header><pre id="prompt-5">장면 사이 전환은 컷을 기본으로, 문제 → 해결로 넘어갈 때만 와이프 1번. 등장은 모두 감속(ease-out)으로 0.6초.</pre></article><article class="prompt-card" data-page="12"><header><h3>지시 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-6" aria-live="polite">복사</button></header><pre id="prompt-6">증거 장면 : 숫자를 0에서 70,000 원까지 1.5초 동안 카운트업, 끝나면 살짝 커지게. 숫자는 이것만 쓰고 지어내지 마.
+마지막 4초 : 표지.png가 아래에서 올라오며 등장 → 정지, 아래에 「전자책 받기 · 프로필 링크」.</pre></article><article class="prompt-card" data-page="13"><header><h3>화면 설계 : 레이어 · 비율 · 소리 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-7" aria-live="polite">복사</button></header><pre id="prompt-7">이 파일을 내레이션으로</pre></article><article class="prompt-card" data-page="16"><header><h3>브리프 한 장 → 30초 영상 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-8" aria-live="polite">복사</button></header><pre id="prompt-8">2번 장면 더 빠르게</pre></article><article class="prompt-card" data-page="16"><header><h3>브리프 한 장 → 30초 영상 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-9" aria-live="polite">복사</button></header><pre id="prompt-9">렌더해 줘</pre></article><article class="prompt-card" data-page="17"><header><h3>홍보 영상 브리프</h3><button type="button" class="copy-btn" data-copy-target="prompt-10" aria-live="polite">복사</button></header><pre id="prompt-10">hyperframes 스킬로 내 전자책 홍보 영상을 만들어 줘.
+- 목적 : 전자책 「책 제목」 소개, 소개 페이지 방문 유도
+- 대상 : 기획서의 독자 한 문장
+- 길이 · 비율 : 45 초, 세로 9:16 (1080×1920) 먼저
+- 톤 : 차분하고 신뢰감 있게, 내레이션 없이 화면 글자 중심
+- 재료 : 이 폴더의 표지.png, 사진.jpg
+- 핵심 3가지 : 1. … 2. … 3. …
+- 핵심 숫자 : 첫 달 7만원 (이 숫자만, 지어내지 말 것)
+- 구조 : 훅 → 문제 → 해결 3가지 → 숫자 증거 → 표지 + 링크 안내
+스토리보드를 먼저 보여 주고, 렌더는 내가 승인한 뒤에 해 줘.</pre></article><article class="prompt-card" data-page="18"><header><h3>수정 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-11" aria-live="polite">복사</button></header><pre id="prompt-11">3번 장면 글자를 반으로 줄여 줘. 5번은 숫자 카운트업으로. 나머지는 그대로.</pre></article><article class="prompt-card" data-page="19"><header><h3>자주 쓰는 수정 지시</h3><button type="button" class="copy-btn" data-copy-target="prompt-12" aria-live="polite">복사</button></header><pre id="prompt-12">· 0~3초 훅 글자 1.5배, 등장 더 빠르게.
+· 12초 장면 너무 길어. 4초로 줄이고 뒤 장면 당겨 줘.
+· 숫자 카운트업 끝나고 1초 멈춤 추가.
+· 전환은 모두 컷으로. 와이프는 해결 구간 시작에만.
+· 배경색을 표지의 남색 계열로 통일.
+· 마지막 표지 장면 3초 → 4초.</pre></article><article class="prompt-card" data-page="19"><header><h3>미리보기 → 말로 수정 루프 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-13" aria-live="polite">복사</button></header><pre id="prompt-13">미리보기 열어 줘</pre></article><article class="prompt-card" data-page="20"><header><h3>1 차 : 빠른 확인용</h3><button type="button" class="copy-btn" data-copy-target="prompt-14" aria-live="polite">복사</button></header><pre id="prompt-14">미리보기 확인했어. check 통과했는지 확인하고 draft 품질로 렌더해 줘. 파일명은 홍보_세로_
+이름.mp4</pre></article><article class="prompt-card" data-page="20"><header><h3>2 차 : 최종본</h3><button type="button" class="copy-btn" data-copy-target="prompt-15" aria-live="polite">복사</button></header><pre id="prompt-15">괜찮아. 같은 설정으로 delivery 품질 최종 렌더해 줘. 파일 크기와 길이도 알려 줘.</pre></article><article class="prompt-card" data-page="21"><header><h3>가로 버전</h3><button type="button" class="copy-btn" data-copy-target="prompt-16" aria-live="polite">복사</button></header><pre id="prompt-16">같은 스토리보드로 가로 16:9 (1920×1080) 버전도 만들어 줘. 글자 배치만 가로에 맞게 다시.
+미리보기 확인 후 렌더할게.</pre></article><article class="prompt-card" data-page="21"><header><h3>웹용 줄이기</h3><button type="button" class="copy-btn" data-copy-target="prompt-17" aria-live="polite">복사</button></header><pre id="prompt-17">가로 영상을 웹 배경용으로 줄여 줘. ffmpeg로 H.264 MP4, 소리 없이, 5MB 이하 목표. 넘으
+면 crf를 올리거나 720p로. 파일명 hero.mp4, 첫 화면은 poster.jpg로 저장하고 용량 알려
+줘.</pre></article><article class="prompt-card" data-page="25"><header><h3>소개 페이지 생성 프롬프트</h3><button type="button" class="copy-btn" data-copy-target="prompt-18" aria-live="polite">복사</button></header><pre id="prompt-18">이 폴더에 전자책 소개 페이지를 index.html 한 파일로 만들어 줘. 영상 · 이미지는 같은 폴더 파
+일을 상대 경로로.
+- 히어로 : hero.mp4 배경 영상 (autoplay muted loop playsinline, poster=&quot;poster.jpg&quot;)
+위에 훅 「훅 문장」 + 「전자책 받기」 버튼
+- 화면 폭 768px 미만이면 영상 대신 poster.jpg
+- 섹션 : 전자책 소개(핵심 3가지, 표지.png) → 목차 5장 → 저자(사진.jpg) → 구매 · 다운로드
+버튼( 링크) → 후기
+- 색 : 표지.png 주요 색 2가지 + 흰 배경, 휴대폰 먼저(반응형)
+- 공유 미리보기 : og:title, og:description, og:image(표지.png)</pre></article><article class="prompt-card" data-page="26"><header><h3>접근성 보완 지시</h3><button type="button" class="copy-btn" data-copy-target="prompt-19" aria-live="polite">복사</button></header><pre id="prompt-19">접근성을 보완해 줘. 나머지 디자인은 그대로.
+- 히어로 영상에 일시정지 / 재생 버튼 (키보드로도 조작, aria-label 포함)
+- 동작 줄이기 설정(prefers-reduced-motion)이면 영상 대신 poster.jpg
+- 영상 위 글자 뒤에 반투명 어두운 층, 글자 대비 4.5:1 이상
+- 영상 안 글자는 본문에도 텍스트로
+- 버튼 최소 44×44px</pre></article><article class="prompt-card" data-page="26"><header><h3>수정 루프 + 접근성 3종 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-20" aria-live="polite">복사</button></header><pre id="prompt-20">첫 화면 글자 더 크게, 버튼은 표지의 주황색으로.</pre></article><article class="prompt-card" data-page="27"><header><h3>배포 후 마지막 지시</h3><button type="button" class="copy-btn" data-copy-target="prompt-21" aria-live="polite">복사</button></header><pre id="prompt-21">주소가 「https://... 」로 정해졌어. og:image와 og:url을 이 주소 기준 전체 경로로 바꿔 줘. 바꾼 폴더는 다시 끌어다 놓을게.</pre></article><article class="prompt-card" data-page="29"><header><h3>오늘 자주 생기는 여섯 가지 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-22" aria-live="polite">복사</button></header><pre id="prompt-22">설치된 스킬 목록</pre></article><article class="prompt-card" data-page="29"><header><h3>오늘 자주 생기는 여섯 가지 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-23" aria-live="polite">복사</button></header><pre id="prompt-23">ffmpeg -version 확인해 줘</pre></article><article class="prompt-card" data-page="29"><header><h3>오늘 자주 생기는 여섯 가지 · 입력 예시</h3><button type="button" class="copy-btn" data-copy-target="prompt-24" aria-live="polite">복사</button></header><pre id="prompt-24">폰트 파일(woff2)을 프로젝트 폴더에 넣고 @font-face로 지정해 줘</pre></article></dialog><dialog id="zoomDialog" aria-labelledby="zoomTitle"><div class="dialog-head"><h2 id="zoomTitle">슬라이드 확대</h2><button id="zoomToggle">원본 크기</button><button data-close="zoomDialog">닫기</button></div><img id="zoomImage" alt="현재 슬라이드 확대"></dialog>
+<script>
+
+
+(function(){
+  /* ▼ 내 강의 고유 접두사로 변경 (예: 'ai0927_') */
+  var LS = 'vibe4_session04_v1_';
+
+  var stage = document.getElementById('stage');
+  var slides = Array.prototype.slice.call(stage.querySelectorAll(':scope > section.slide'));
+  var total = slides.length;
+  var STORAGE_KEY = LS + 'slide';
+  var idx = 0;
+
+  function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e) { /* 저장 불가 환경 · 무시 */ } }
+
+  /* 시작 위치: ?slide=N 우선, 없으면 마지막으로 본 장 */
+  var params = new URLSearchParams(location.search);
+  var WANT_ADMIN = params.has('admin');
+  var IS_SCREEN = params.has('screen');
+  var IS_VIEW = params.has('view');
+  var qSlide = parseInt(params.get('slide'), 10);
+  if (!isNaN(qSlide) && qSlide >= 1 && qSlide <= total) {
+    idx = qSlide - 1;
+  } else {
+    var saved = parseInt(lsGet(STORAGE_KEY), 10);
+    if (!isNaN(saved) && saved >= 0 && saved < total) idx = saved;
+  }
+
+  var progressEl = document.getElementById('progress');
+  var counterEl = document.getElementById('counter');
+  var navPrev = document.getElementById('navPrev');
+  var navNext = document.getElementById('navNext');
+  var gridOverlay = document.getElementById('gridOverlay');
+  var gridList = document.getElementById('gridList');
+  var minis = [];
+  var lastFocus = null;
+  var LOCKED = true;
+  var PDF_OK = true;
+  var IS_ADMIN = false;
+  var sync = null;
+  var viewers = null;
+  var online = false;
+  var STATE_EMPTY = false;
+  var controlPanel = document.getElementById('instructorPanel');
+
+  function canNav(){ if(!IS_VIEW && !document.getElementById('focusOverlay').hidden)return false; return IS_ADMIN || IS_VIEW || !sync || !LOCKED; }
+  function updateNav(){
+    var ok = canNav();
+    navPrev.disabled = !ok || idx === 0;
+    navNext.disabled = !ok || idx === total - 1;
+    var text = '';
+    var follow = false;
+    if (STATE_EMPTY && !IS_ADMIN) { text = '수업 시작 전 · 강사 화면 대기 중'; follow = true; }
+    else if (IS_ADMIN) text = '관리자';
+    else if (IS_VIEW || !sync) text = '자유 열람';
+    else if (LOCKED) { text = '발표자를 따라가는 중'; follow = true; }
+    else text = '자유 이동';
+    var mode = document.getElementById('modeBadge');
+    mode.textContent = text;
+    mode.classList.toggle('show', !!text);
+    mode.classList.toggle('follow', follow);
+    var lockBtn = document.getElementById('lockBtn');
+    var pdfBtn = document.getElementById('pdfBtn');
+    var controlBtn = document.getElementById('controlBtn');
+    lockBtn.hidden = pdfBtn.hidden = !IS_ADMIN;
+    controlBtn.hidden = !IS_ADMIN;
+    lockBtn.textContent = LOCKED ? '🔒 잠금 중' : '🔓 자유 이동';
+    lockBtn.setAttribute('aria-pressed', String(LOCKED));
+    pdfBtn.textContent = PDF_OK ? 'PDF 허용 중' : 'PDF 막힘';
+    pdfBtn.setAttribute('aria-pressed', String(PDF_OK));
+    updateControlPanel();
+  }
+
+  function updateControlPanel(){
+    document.getElementById('ctlSlide').textContent = (idx + 1) + ' / ' + total;
+    document.getElementById('ctlViewers').textContent = viewers === null ? '-' : viewers + '명';
+    document.getElementById('ctlConnection').textContent = sync ? (online ? '연결' : '연결 중') : '로컬';
+    document.getElementById('ctlJump').value = idx + 1;
+    document.getElementById('ctlPrev').disabled = idx === 0;
+    document.getElementById('ctlNext').disabled = idx === total - 1;
+    var lock = document.getElementById('ctlLock');
+    var pdf = document.getElementById('ctlPdf');
+    lock.textContent = LOCKED ? '🔒 청중 잠금 중' : '🔓 자유 이동';
+    pdf.textContent = PDF_OK ? 'PDF 허용 중' : 'PDF 차단 중';
+    lock.classList.toggle('policy-on', LOCKED);
+    pdf.classList.toggle('policy-on', PDF_OK);
+  }
+
+  function toggleControl(force){
+    if (!IS_ADMIN) return;
+    var open = typeof force === 'boolean' ? force : controlPanel.hidden;
+    controlPanel.hidden = !open;
+    document.getElementById('controlBtn').setAttribute('aria-expanded', String(open));
+    if (open) document.getElementById('ctlNext').focus();
+  }
+
+  function commitLock(){
+    if (sync) sync.setLock(!LOCKED).catch(function(){ flash('저장 실패'); });
+    else { LOCKED = !LOCKED; updateNav(); }
+  }
+  function commitPdf(){
+    if (sync) sync.setPdf(!PDF_OK).catch(function(){ flash('저장 실패'); });
+    else { applyPdf(!PDF_OK); updateNav(); }
+  }
+
+  function show(i){
+    idx = Math.max(0, Math.min(total - 1, i));
+    slides.forEach(function(s, n){
+      s.classList.toggle('active', n === idx);
+      s.setAttribute('aria-hidden', n === idx ? 'false' : 'true');
+    });
+    progressEl.style.width = ((idx + 1) / total * 100) + '%';
+    counterEl.textContent = (idx + 1) + ' / ' + total;
+    minis.forEach(function(m, n){ m.classList.toggle('current', n === idx); });
+    lsSet(STORAGE_KEY, String(idx));
+    updateNav();
+  }
+  function navigate(i){
+    if (!canNav()) return;
+    show(i);
+    if (IS_ADMIN && sync) sync.setSlide(idx).catch(function(){ flash('저장 실패 · 관리자 권한 확인'); });
+  }
+  function applyPdf(ok){
+    PDF_OK = !!ok;
+    document.getElementById('printBtn').style.display = PDF_OK ? '' : 'none';
+    document.documentElement.classList.toggle('no-pdf', !PDF_OK);
+    document.querySelector('#nav .hint').textContent = PDF_OK ? '← → 이동 · G 전체보기 · P PDF' : '← → 이동 · G 전체보기';
+  }
+  function flash(msg){
+    var badge = document.getElementById('connBadge');
+    badge.hidden = false;
+    badge.textContent = msg;
+  }
+
+  function scaleMinis(){
+    minis.forEach(function(m){ m.firstChild.style.transform = 'scale(' + (m.clientWidth / 960) + ')'; });
+  }
+  window.addEventListener('resize', function(){ if (gridOverlay.classList.contains('open')) scaleMinis(); });
+  function openGrid(){
+    lastFocus = document.activeElement;
+    gridOverlay.classList.add('open');
+    scaleMinis();
+    var c = minis[idx];
+    if (c) { c.scrollIntoView({block:'center'}); c.focus(); }
+  }
+  function closeGrid(){
+    gridOverlay.classList.remove('open');
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  IS_ADMIN = false; updateNav();
+  document.getElementById('lockBtn').addEventListener('click', commitLock);
+  document.getElementById('pdfBtn').addEventListener('click', commitPdf);
+  document.getElementById('controlBtn').addEventListener('click', function(){ toggleControl(); });
+  document.getElementById('controlClose').addEventListener('click', function(){ toggleControl(false); });
+  document.getElementById('ctlPrev').addEventListener('click', function(){ navigate(idx - 1); });
+  document.getElementById('ctlNext').addEventListener('click', function(){ navigate(idx + 1); });
+  document.getElementById('ctlGo').addEventListener('click', function(){ navigate((parseInt(document.getElementById('ctlJump').value, 10) || 1) - 1); });
+  document.getElementById('ctlJump').addEventListener('keydown', function(e){ if (e.key === 'Enter') document.getElementById('ctlGo').click(); });
+  document.getElementById('ctlLock').addEventListener('click', commitLock);
+  document.getElementById('ctlPdf').addEventListener('click', commitPdf);
+  document.getElementById('ctlFullscreen').addEventListener('click', function(){ if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){}); else document.exitFullscreen(); });
+  document.getElementById('ctlGrid').addEventListener('click', function(){ toggleControl(false); openGrid(); });
+
+  var ctlTimerSeconds = 50 * 60;
+  var ctlTimerRunning = false;
+  var ctlTimerId = null;
+  function renderCtlTimer(){ var m=Math.floor(ctlTimerSeconds/60),s=ctlTimerSeconds%60;document.getElementById('ctlTimer').textContent=m+':'+(s<10?'0':'')+s;document.getElementById('ctlTimerToggle').textContent=ctlTimerRunning?'일시정지':'시작'; }
+  document.getElementById('ctlTimerToggle').addEventListener('click', function(){ctlTimerRunning=!ctlTimerRunning;if(ctlTimerRunning&&!ctlTimerId)ctlTimerId=setInterval(function(){if(ctlTimerSeconds>0){ctlTimerSeconds--;renderCtlTimer();}else{ctlTimerRunning=false;clearInterval(ctlTimerId);ctlTimerId=null;renderCtlTimer();flash('수업 타이머 종료');}},1000);renderCtlTimer();});
+  document.getElementById('ctlTimerReset').addEventListener('click', function(){ctlTimerRunning=false;if(ctlTimerId){clearInterval(ctlTimerId);ctlTimerId=null;}ctlTimerSeconds=50*60;renderCtlTimer();});
+  renderCtlTimer();
+
+  document.addEventListener('keydown', function(e){
+    var t = e.target;
+    /* 로그인 입력 중에는 키보드 이동 중지 · 그 외 방향키는 포커스 위치와 무관하게 최우선 */
+    if (document.querySelector('dialog[open]')) return;
+    if (t && t.closest && t.closest('input, textarea, select')) return;
+    if (gridOverlay.classList.contains('open')) {
+      if (e.key === 'Escape' || e.key === 'g' || e.key === 'G') { closeGrid(); }
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); navigate(idx + 1); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); navigate(idx - 1); return; }
+    if (t && t.closest && t.closest('input, textarea, select')) return;
+    /* 버튼에 포커스가 있을 때 스페이스·엔터는 버튼 동작에 양보 */
+    var onButton = t && t.closest && t.closest('button, a');
+    if ((e.key === ' ' || e.key === 'Enter') && onButton) return;
+    if (e.key === ' ') { e.preventDefault(); navigate(idx + 1); }
+    else if (e.key === 'g' || e.key === 'G' || e.key === 'ㅎ') { openGrid(); }
+    else if (e.key === 'p' || e.key === 'P' || e.key === 'ㅔ') { e.preventDefault(); if (PDF_OK) window.print(); }
+    else if (e.key === 'Home') { navigate(0); }
+    else if (e.key === 'End') { navigate(total - 1); }
+    else if ((e.key === 'c' || e.key === 'C' || e.key === 'ㅊ') && IS_ADMIN) { toggleControl(); }
+  });
+
+  /* 무대 클릭: 오른쪽 절반 다음 · 왼쪽 절반 이전 (버튼·링크·프롬프트 카드 제외) */
+  stage.addEventListener('click', function(e){
+    if (e.target.closest('button, a, .prompt-card')) return;
+    var rect = stage.getBoundingClientRect();
+    if (e.clientX - rect.left > rect.width / 2) navigate(idx + 1); else navigate(idx - 1);
+  });
+  navPrev.addEventListener('click', function(){ navigate(idx - 1); });
+  navNext.addEventListener('click', function(){ navigate(idx + 1); });
+  document.getElementById('gridBtn').addEventListener('click', openGrid);
+  document.getElementById('gridClose').addEventListener('click', closeGrid);
+  document.getElementById('printBtn').addEventListener('click', function(){ if (PDF_OK) window.print(); });
+
+  /* 타이머: 벽시계 기준 (탭이 뒤로 가도 시간이 밀리지 않음) */
+  function initTimer(el){
+    var totalSec = parseInt(el.dataset.minutes, 10) * 60;
+    var remaining = totalSec;
+    var endAt = null;
+    var running = false;
+    var tickId = null;
+    var timeEl = el.querySelector('.time');
+    var stateEl = el.querySelector('.state');
+
+    function currentRemaining(){
+      if (!running) return remaining;
+      return Math.round((endAt - Date.now()) / 1000);
+    }
+    function format(sec){
+      var neg = sec < 0, abs = Math.abs(sec);
+      var m = Math.floor(abs / 60), s = abs % 60;
+      return (neg ? '+' : '') + m + ':' + (s < 10 ? '0' + s : s);
+    }
+    function render(){
+      var sec = currentRemaining();
+      timeEl.textContent = format(sec);
+      el.classList.toggle('warn', sec <= 60);
+      if (stateEl) stateEl.textContent = running ? '진행' : '정지';
+    }
+    function start(){
+      if (running) return;
+      running = true;
+      endAt = Date.now() + remaining * 1000;
+      el.classList.add('running');
+      tickId = setInterval(render, 250);
+      render();
+    }
+    function pause(){
+      if (running) remaining = currentRemaining();
+      running = false;
+      el.classList.remove('running');
+      clearInterval(tickId);
+      render();
+    }
+    function reset(){
+      running = false;
+      clearInterval(tickId);
+      remaining = totalSec;
+      el.classList.remove('running');
+      render();
+    }
+    el.addEventListener('click', function(){ if (running) pause(); else start(); });
+    el.addEventListener('dblclick', function(e){ e.stopPropagation(); reset(); });
+    el.addEventListener('keydown', function(e){ if (e.key === 'r' || e.key === 'R' || e.key === 'ㄱ') { e.preventDefault(); reset(); } });
+    render();
+  }
+  stage.querySelectorAll('.timer-chip, .break-big[data-minutes]').forEach(initTimer);
+
+  /* 복사 버튼: clipboard API가 700ms 안에 끝나지 않으면 textarea 폴백 · 완료 표시는 한 번만 */
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var target = document.getElementById(btn.dataset.copyTarget);
+      var text = target ? target.textContent : '';
+      var settled = false;
+      function done(){
+        if (settled) return;
+        settled = true;
+        btn.textContent = '✓ 복사 완료';
+        btn.classList.add('copied');
+        setTimeout(function(){ btn.textContent = '복사'; btn.classList.remove('copied'); }, 1500);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        setTimeout(function(){ if (!settled) fallbackCopy(text, done); }, 700);
+        navigator.clipboard.writeText(text).then(done).catch(function(){ fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
+  });
+  function fallbackCopy(text, done){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* 구형 브라우저 · 무시 */ }
+    document.body.removeChild(ta);
+    done();
+  }
+
+  /* 전체보기 축소판: 타이머·복사 핸들러를 붙인 뒤 마지막에 생성 · 복제본은 inert로 포커스 제외 */
+  slides.forEach(function(s, n){
+    var mini = document.createElement('div');
+    mini.className = 'mini';
+    mini.tabIndex = 0;
+    mini.setAttribute('role', 'button');
+    mini.setAttribute('aria-label', (s.getAttribute('aria-label') || String(n + 1)) + ' 슬라이드로 이동');
+    var copy = document.createElement('div');
+    copy.className = s.className.replace(/\bactive\b/, '').trim();
+    copy.setAttribute('aria-hidden', 'true');
+    copy.setAttribute('inert', '');
+    copy.innerHTML = s.innerHTML;
+    copy.querySelectorAll('[id]').forEach(function(el){ el.removeAttribute('id'); });
+    var num = document.createElement('span');
+    num.className = 'mini-num';
+    num.setAttribute('aria-hidden', 'true');
+    num.textContent = (n + 1) + '. ' + slides[n].getAttribute('aria-label').replace(/^\d+\. /,'');
+    var inner = document.createElement('div');
+    inner.className = 'mini-inner';
+    inner.appendChild(copy);
+    mini.appendChild(inner);
+    mini.appendChild(num);
+    mini.addEventListener('click', function(){ navigate(n); closeGrid(); });
+    mini.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(n); closeGrid(); } });
+    gridList.appendChild(mini);
+    minis.push(mini);
+  });
+
+  var pd=document.getElementById('promptDialog'), zd=document.getElementById('zoomDialog');
+  document.getElementById('promptBtn').addEventListener('click',function(){
+    var count=0; pd.querySelectorAll('.prompt-card').forEach(function(c){c.hidden=Number(c.dataset.page)!==idx+1;if(!c.hidden)count++;});
+    document.getElementById('promptTitle').textContent=(idx+1)+'장 · 프롬프트';document.getElementById('promptEmpty').hidden=!!count;pd.showModal();
+  });
+  document.getElementById('zoomBtn').addEventListener('click',function(){var img=slides[idx].querySelector('img');document.getElementById('zoomImage').src=img.src;document.getElementById('zoomImage').alt=img.alt;zd.classList.remove('zoomed');document.getElementById('zoomToggle').textContent='원본 크기';zd.showModal();});
+  document.getElementById('zoomToggle').addEventListener('click',function(){zd.classList.toggle('zoomed');this.textContent=zd.classList.contains('zoomed')?'화면 맞춤':'원본 크기';});
+  document.querySelectorAll('[data-close]').forEach(function(b){b.addEventListener('click',function(){document.getElementById(b.dataset.close).close();});});
+  document.getElementById('fullscreenBtn').addEventListener('click',function(){if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(function(){flash('전체화면 사용 불가');});else document.exitFullscreen();});
+
+  show(idx);
+  // Firebase bridge inside original viewer closure: preserve navigation/PDF code.
+  var remoteState=null,remoteSlide=null,remoteOnline=false;
+  var fbStatus=document.getElementById('syncStatus');
+  var focusOverlay=document.getElementById('focusOverlay');
+  function offlineView(message){sync=null;LOCKED=false;applyPdf(true);focusOverlay.hidden=true;updateNav();fbStatus.textContent=message;}
+  function applyRemote(s){
+    if(!s||s.isEmpty){offlineView(s&&s.isEmpty?'수업 시작 전 · 자유 열람':'동기화 상태 확인 필요 · 자유 열람');return;}
+    remoteState=s;
+    if(!remoteOnline)return;
+    if(s.lesson!==4){var route={"1": "../01/slides.html", "2": "../02/slides.html", "3": "../03/slides.html", "4": "../04/slides.html"}[s.lesson];if(route)location.replace(route+'?slide='+(s.slide+1));return;}
+    sync=window.vibe4StudentTransport;STATE_EMPTY=false;LOCKED=s.locked;applyPdf(s.pdf);focusOverlay.hidden=!s.focus;
+    if(remoteSlide!==s.slide||LOCKED||IS_SCREEN)show(s.slide);else updateNav();
+    remoteSlide=s.slide;fbStatus.textContent='실시간 연결 · 4차시 · '+(s.locked?'강사 따라가기':'자유 이동');
+  }
+  if(!IS_VIEW){
+    fbStatus.textContent='Firebase 연결 중 · 기본 슬라이드 열람 가능';
+    var fallbackTimer=setTimeout(function(){if(!remoteOnline)offlineView('연결 지연 · 자유 열람 · 재연결 대기');},8000);
+    import('../../firebase/sync.js').then(function(module){
+      if(!module.isConfigured(window.FIREBASE_CONFIG))throw Error('config-missing');
+      var transport=module.createSync(window.FIREBASE_CONFIG,window.DECK_ID);
+      window.vibe4StudentTransport=transport;
+      transport.onState(function(s){clearTimeout(fallbackTimer);if(!s||s.isEmpty)remoteState=null;applyRemote(s)});
+      transport.onConnection(function(on){remoteOnline=on;if(on){if(remoteState)applyRemote(remoteState)}else offlineView('동기화 연결 끊김 · 자유 열람 · 재연결 대기')});
+    }).catch(function(){clearTimeout(fallbackTimer);offlineView('Firebase 연결 실패 · 자유 열람')});
+  }else{fbStatus.textContent='강사 미리보기 · 동기화 없이 열람';}
+
+})();
+</script>
+</body>
+</html>
